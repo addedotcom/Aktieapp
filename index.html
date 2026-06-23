@@ -264,22 +264,30 @@ async function loadSpikes(){
 
 function renderSpikes(){
   const sc=document.getElementById('spike-scroll');
-  const groups=[{label:'Senaste 6 timmarna',max:6},{label:'6–18 timmar sedan',max:18},{label:'18–36 timmar sedan',max:36}];
+  const up=spikeData.filter(q=>q.dir==='up');
+  const dn=spikeData.filter(q=>q.dir==='down');
+  const neu=spikeData.filter(q=>q.dir==='neutral');
   let html='';
-  groups.forEach(g=>{
-    const gi=spikeData.filter(q=>q.hoursAgo<g.max&&(g.max===6||q.hoursAgo>=(g.max===18?6:18)));
-    if(!gi.length)return;
-    html+=`<div class="tsep">${g.label}</div>`;
-    gi.forEach(q=>{
-      const dirBg=q.dir==='up'?'var(--green-l)':q.dir==='down'?'var(--red-l)':'var(--bg)';
-      const dirC=q.dir==='up'?'var(--green)':q.dir==='down'?'var(--red)':'var(--muted)';
-      const dirL=q.dir==='up'?'↑ Positiv':q.dir==='down'?'↓ Negativ':'→ Neutral';
+  [[up,'Köpsignaler 📈'],[dn,'Säljsignaler 📉'],[neu,'Neutral aktivitet']].forEach(([grp,label])=>{
+    if(!grp.length)return;
+    html+=`<div class="tsep">${label} · ${grp.length} aktier</div>`;
+    grp.forEach(q=>{
+      const isUp=q.dir==='up', isDn=q.dir==='down';
+      const bg=isUp?'var(--green-l)':isDn?'var(--red-l)':'var(--bg)';
+      const col=isUp?'var(--green)':isDn?'var(--red)':'var(--muted)';
+      const badge=isUp?'↑ Köp':isDn?'↓ Sälj':'→ Neutral';
+      const bars=[22,30,18,25,20,28].map(h=>`<div class="bar-n" style="height:${h}%"></div>`).join('')+
+        `<div class="bar-s" style="height:80%;background:${isUp?'#27AE60':isDn?'#E74C3C':'#7f8c8d'}"></div>`;
       html+=`<div class="card"><a href="${q.link}" target="_blank" rel="noopener">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-          <div><span style="font-size:16px;font-weight:500">${q.ticker}</span><span style="font-size:11px;color:var(--muted);margin-left:6px">${q.name}</span></div>
-          <span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;background:${dirBg};color:${dirC};white-space:nowrap">${dirL}</span>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div>
+            <span style="font-size:17px;font-weight:600">${q.ticker}</span>
+            <span style="font-size:11px;color:var(--muted);margin-left:6px">${q.name}</span>
+          </div>
+          <span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${bg};color:${col};white-space:nowrap">${badge}</span>
         </div>
-        <p style="font-size:13px;font-weight:500;line-height:1.45;color:var(--text);margin-bottom:6px">${q.headline}</p>
+        <div class="bars">${bars}</div>
+        <p style="font-size:12px;line-height:1.45;color:var(--muted);margin-bottom:5px">${q.headline}</p>
         <div style="font-size:11px;color:var(--muted)">${q.hoursAgo} tim sedan</div>
       </a></div>`;
     });
