@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>Aktieapp</title>
+<title>Akatier</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -235,15 +235,6 @@ async function fetchNewsBySymbol(sym){
 }
 
 // ── AI AKTIEANALYS ────────────────────────────────────────────────────────────
-const GEMINI_KEY='AQ.Ab8RN6LT3YSK6f5H9okf0OaBZrPCBWJVBliZsrrmK_MLCY4w2A';
-
-const PROMPTS={
-  dipp:'Du är en erfaren aktieanalytiker. Analysera S&P 500 just nu och hitta de 5-7 mest intressanta aktierna med dippar som kan vara köpmöjligheter. Svara ENBART med ren JSON utan markdown: {"summary":"En mening om marknadsläget","stocks":[{"ticker":"AAPL","name":"Apple Inc","signal":"köp","change":"-3.2%","reason":"Förklaring på svenska","risk":"låg"}]}. signal=köp/bevaka/undvik, risk=låg/medel/hög.',
-  köp:'Du är en erfaren aktieanalytiker. Hitta de 5-7 starkaste köplägena i S&P 500 just nu. Svara ENBART med ren JSON utan markdown: {"summary":"En mening om köplägen","stocks":[{"ticker":"NVDA","name":"Nvidia","signal":"köp","change":"+2.1%","reason":"Förklaring på svenska","risk":"medel"}]}.',
-  sektor:'Du är en erfaren aktieanalytiker. Analysera vilka sektorer i S&P 500 som är starkast/svagast just nu. Svara ENBART med ren JSON utan markdown: {"summary":"En mening om sektorer","stocks":[{"ticker":"XLK","name":"Tekniksektorn","signal":"köp","change":"+1.8%","reason":"Förklaring på svenska","risk":"medel"}]}.',
-  risk:'Du är en erfaren aktieanalytiker. Identifiera 5-7 aktier i S&P 500 med högst risk just nu. Svara ENBART med ren JSON utan markdown: {"summary":"En mening om riskläget","stocks":[{"ticker":"TSLA","name":"Tesla","signal":"undvik","change":"-1.5%","reason":"Förklaring på svenska","risk":"hög"}]}.'
-};
-
 async function loadSpikes(){runAnalysis('dipp');}
 
 async function runAnalysis(type){
@@ -252,23 +243,14 @@ async function runAnalysis(type){
     const b=document.getElementById('btn-'+t);
     if(b)b.classList.toggle('on',t===type);
   });
-  sc.innerHTML='<div class="spin-wrap" style="flex-direction:column;gap:12px"><div class="spin"></div><span style="font-size:12px;color:var(--muted)">AI analyserar marknaden…</span></div>';
+  sc.innerHTML='<div class="spin-wrap" style="flex-direction:column;gap:12px"><div class="spin"></div><span style="font-size:12px;color:var(--muted)">Akatier analyserar S&P 500…</span></div>';
   try{
-    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_KEY,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        contents:[{parts:[{text:PROMPTS[type]}]}],
-        tools:[{googleSearch:{}}]
-      })
-    });
-    if(!res.ok) throw new Error('Gemini HTTP '+res.status);
-    const data=await res.json();
-    const text=data.candidates?.[0]?.content?.parts?.find(p=>p.text)?.text||'';
-    const clean=text.replace(/```json|```/g,'').trim();
-    const parsed=JSON.parse(clean);
+    const res=await fetch('/api/analyze?type='+encodeURIComponent(type));
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const parsed=await res.json();
+    if(parsed.error) throw new Error(parsed.error);
     renderAnalysis(parsed,type);
-  }catch(e){sc.innerHTML=err('AI-analys misslyckades: '+e.message,"runAnalysis('"+type+"')");}
+  }catch(e){sc.innerHTML=err('Analys misslyckades: '+e.message,"runAnalysis('"+type+"')");}
 }
 
 function renderAnalysis(data,type){
@@ -297,7 +279,7 @@ function renderAnalysis(data,type){
       </div>
     </div>`;
   });
-  html+=`<div style="text-align:center;padding:12px;font-size:11px;color:var(--muted)">Gemini AI · Ej finansiell rådgivning</div>`;
+  html+=`<div style="text-align:center;padding:12px;font-size:11px;color:var(--muted)">Akatier AI · Ej finansiell rådgivning</div>`;
   sc.innerHTML=html;
 }
 
