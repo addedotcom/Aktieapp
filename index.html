@@ -13,7 +13,6 @@ html,body{height:100%;font-family:'Inter',-apple-system,sans-serif;background:va
 button{cursor:pointer;font-family:inherit}
 a{color:inherit;text-decoration:none}
 #app{max-width:430px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-.statusbar{background:var(--surface);padding:10px 20px 6px;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:500;border-bottom:0.5px solid var(--border);flex-shrink:0}
 .page{display:none;flex-direction:column;flex:1;overflow:hidden}.page.active{display:flex}
 .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .tabbar{display:flex;background:var(--surface);border-top:0.5px solid var(--border);padding:8px 0 max(16px,env(safe-area-inset-bottom));flex-shrink:0}
@@ -47,7 +46,6 @@ a{color:inherit;text-decoration:none}
 </head>
 <body>
 <div id="app">
-  <div class="statusbar"><span id="clock"></span><span>📶 🔋</span></div>
 
   <!-- NYHETER -->
   <div class="page active" id="pg-news">
@@ -71,7 +69,13 @@ a{color:inherit;text-decoration:none}
 
   <!-- KURSHOPP -->
   <div class="page" id="pg-spikes">
-    <div class="sechead"><h2>Ovanliga rörelser</h2><p id="spike-sub">Bevakningslista · senaste 36h</p></div>
+    <div class="sechead"><h2>AI-Aktieanalys</h2><p>S&amp;P 500 · köpmöjligheter &amp; dippar</p></div>
+    <div style="padding:10px 11px;background:var(--surface);border-bottom:0.5px solid var(--border);flex-shrink:0;display:flex;gap:6px">
+      <button onclick="runAnalysis('dipp')" class="chip on" id="btn-dipp">📉 Dippar</button>
+      <button onclick="runAnalysis('köp')" class="chip" id="btn-köp">🚀 Köplägen</button>
+      <button onclick="runAnalysis('sektor')" class="chip" id="btn-sektor">📊 Sektorer</button>
+      <button onclick="runAnalysis('risk')" class="chip" id="btn-risk">⚠️ Risk</button>
+    </div>
     <div class="scroll" id="spike-scroll"></div>
   </div>
 
@@ -106,8 +110,6 @@ const R2J='https://api.rss2json.com/v1/api.json?rss_url=';
 const POS=/beat|surge|jump|rise|gain|rally|high|record|buy|upgrade|profit|growth|strong|bull|soar|boost/i;
 const NEG=/miss|fall|drop|decline|down|low|sell|downgrade|loss|weak|bear|cut|warn|crash|slide|plunge/i;
 
-function clock(){const n=new Date();document.getElementById('clock').textContent=n.getHours()+':'+(n.getMinutes()<10?'0':'')+n.getMinutes();}
-clock();setInterval(clock,30000);
 
 function switchTab(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -232,67 +234,71 @@ async function fetchNewsBySymbol(sym){
   }catch(e){sc.innerHTML=err(e.message,"fetchNewsBySymbol('"+sym+"')");}
 }
 
-// ── KURSHOPP ──────────────────────────────────────────────────────────────────
-const WATCH=[
-  {sym:'NVDA',name:'Nvidia'},{sym:'AAPL',name:'Apple'},{sym:'MSFT',name:'Microsoft'},
-  {sym:'TSLA',name:'Tesla'},{sym:'META',name:'Meta'},{sym:'AMZN',name:'Amazon'},
-  {sym:'GOOGL',name:'Alphabet'},{sym:'AMD',name:'AMD'},{sym:'PLTR',name:'Palantir'},
-  {sym:'COIN',name:'Coinbase'},{sym:'XOM',name:'ExxonMobil'},{sym:'LLY',name:'Eli Lilly'},
-  {sym:'JPM',name:'JPMorgan'},{sym:'NFLX',name:'Netflix'},{sym:'INTC',name:'Intel'},
-];
-let spikeData=[];
+// ── AI AKTIEANALYS ────────────────────────────────────────────────────────────
+const GEMINI_KEY='AQ.Ab8RN6LT3YSK6f5H9okf0OaBZrPCBWJVBliZsrrmK_MLCY4w2A';
 
-async function loadSpikes(){
+const PROMPTS={
+  dipp:'Du är en erfaren aktieanalytiker. Analysera S&P 500 just nu och hitta de 5-7 mest intressanta aktierna med dippar som kan vara köpmöjligheter. Svara ENBART med ren JSON utan markdown: {"summary":"En mening om marknadsläget","stocks":[{"ticker":"AAPL","name":"Apple Inc","signal":"köp","change":"-3.2%","reason":"Förklaring på svenska","risk":"låg"}]}. signal=köp/bevaka/undvik, risk=låg/medel/hög.',
+  köp:'Du är en erfaren aktieanalytiker. Hitta de 5-7 starkaste köplägena i S&P 500 just nu. Svara ENBART med ren JSON utan markdown: {"summary":"En mening om köplägen","stocks":[{"ticker":"NVDA","name":"Nvidia","signal":"köp","change":"+2.1%","reason":"Förklaring på svenska","risk":"medel"}]}.',
+  sektor:'Du är en erfaren aktieanalytiker. Analysera vilka sektorer i S&P 500 som är starkast/svagast just nu. Svara ENBART med ren JSON utan markdown: {"summary":"En mening om sektorer","stocks":[{"ticker":"XLK","name":"Tekniksektorn","signal":"köp","change":"+1.8%","reason":"Förklaring på svenska","risk":"medel"}]}.',
+  risk:'Du är en erfaren aktieanalytiker. Identifiera 5-7 aktier i S&P 500 med högst risk just nu. Svara ENBART med ren JSON utan markdown: {"summary":"En mening om riskläget","stocks":[{"ticker":"TSLA","name":"Tesla","signal":"undvik","change":"-1.5%","reason":"Förklaring på svenska","risk":"hög"}]}.'
+};
+
+async function loadSpikes(){runAnalysis('dipp');}
+
+async function runAnalysis(type){
   const sc=document.getElementById('spike-scroll');
-  if(spikeData.length){renderSpikes();return;}
-  sc.innerHTML=spin();
+  ['dipp','köp','sektor','risk'].forEach(t=>{
+    const b=document.getElementById('btn-'+t);
+    if(b)b.classList.toggle('on',t===type);
+  });
+  sc.innerHTML='<div class="spin-wrap" style="flex-direction:column;gap:12px"><div class="spin"></div><span style="font-size:12px;color:var(--muted)">AI analyserar marknaden…</span></div>';
   try{
-    const res=await Promise.allSettled(WATCH.map(w=>
-      fetch(R2J+encodeURIComponent('https://feeds.finance.yahoo.com/rss/2.0/headline?s='+w.sym+'&region=US&lang=en-US'))
-        .then(r=>r.json()).then(d=>({w,items:(d.items||[]).slice(0,2)}))
-    ));
-    spikeData=res.filter(r=>r.status==='fulfilled'&&r.value.items.length).map(r=>{
-      const{w,items}=r.value;
-      const h=Math.round((Date.now()-new Date(items[0].pubDate))/3600000);
-      return{ticker:w.sym,name:w.name,headline:items[0].title,link:items[0].link,hoursAgo:h,
-        dir:POS.test(items[0].title)?'up':NEG.test(items[0].title)?'down':'neutral'};
-    }).filter(q=>q.hoursAgo<=36).sort((a,b)=>a.hoursAgo-b.hoursAgo);
-    document.getElementById('spike-sub').textContent=spikeData.length+' aktier · senaste 36h';
-    renderSpikes();
-  }catch(e){sc.innerHTML=err(e.message,'loadSpikes()');}
+    const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_KEY,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        contents:[{parts:[{text:PROMPTS[type]}]}],
+        tools:[{googleSearch:{}}]
+      })
+    });
+    if(!res.ok) throw new Error('Gemini HTTP '+res.status);
+    const data=await res.json();
+    const text=data.candidates?.[0]?.content?.parts?.find(p=>p.text)?.text||'';
+    const clean=text.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    renderAnalysis(parsed,type);
+  }catch(e){sc.innerHTML=err('AI-analys misslyckades: '+e.message,"runAnalysis('"+type+"')");}
 }
 
-function renderSpikes(){
+function renderAnalysis(data,type){
   const sc=document.getElementById('spike-scroll');
-  const up=spikeData.filter(q=>q.dir==='up');
-  const dn=spikeData.filter(q=>q.dir==='down');
-  const neu=spikeData.filter(q=>q.dir==='neutral');
-  let html='';
-  [[up,'Köpsignaler 📈'],[dn,'Säljsignaler 📉'],[neu,'Neutral aktivitet']].forEach(([grp,label])=>{
-    if(!grp.length)return;
-    html+=`<div class="tsep">${label} · ${grp.length} aktier</div>`;
-    grp.forEach(q=>{
-      const isUp=q.dir==='up', isDn=q.dir==='down';
-      const bg=isUp?'var(--green-l)':isDn?'var(--red-l)':'var(--bg)';
-      const col=isUp?'var(--green)':isDn?'var(--red)':'var(--muted)';
-      const badge=isUp?'↑ Köp':isDn?'↓ Sälj':'→ Neutral';
-      const bars=[22,30,18,25,20,28].map(h=>`<div class="bar-n" style="height:${h}%"></div>`).join('')+
-        `<div class="bar-s" style="height:80%;background:${isUp?'#27AE60':isDn?'#E74C3C':'#7f8c8d'}"></div>`;
-      html+=`<div class="card"><a href="${q.link}" target="_blank" rel="noopener">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-          <div>
-            <span style="font-size:17px;font-weight:600">${q.ticker}</span>
-            <span style="font-size:11px;color:var(--muted);margin-left:6px">${q.name}</span>
-          </div>
-          <span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${bg};color:${col};white-space:nowrap">${badge}</span>
-        </div>
-        <div class="bars">${bars}</div>
-        <p style="font-size:12px;line-height:1.45;color:var(--muted);margin-bottom:5px">${q.headline}</p>
-        <div style="font-size:11px;color:var(--muted)">${q.hoursAgo} tim sedan</div>
-      </a></div>`;
-    });
+  const typeLabel={dipp:'Dippar & Köpmöjligheter',köp:'Starkaste Köplägen',sektor:'Sektoranalys',risk:'Riskvarningar'}[type];
+  let html=`<div style="margin:10px 11px;padding:12px;background:var(--surface);border-radius:var(--r);border:0.5px solid var(--border)">
+    <div style="font-size:10px;font-weight:600;color:var(--blue);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">AI · ${typeLabel}</div>
+    <p style="font-size:13px;color:var(--text);line-height:1.5">${data.summary||''}</p>
+  </div>`;
+  (data.stocks||[]).forEach(s=>{
+    const isKöp=s.signal==='köp',isUndvik=s.signal==='undvik';
+    const sigBg=isKöp?'var(--green-l)':isUndvik?'var(--red-l)':'var(--amber-l)';
+    const sigC=isKöp?'var(--green)':isUndvik?'var(--red)':'var(--amber)';
+    const sigL=isKöp?'↑ Köp':isUndvik?'↓ Undvik':'◉ Bevaka';
+    const riskC=s.risk==='låg'?'var(--green)':s.risk==='hög'?'var(--red)':'var(--amber)';
+    const chgC=(s.change||'').startsWith('-')?'var(--red)':'var(--green)';
+    html+=`<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div><span style="font-size:18px;font-weight:700">${s.ticker}</span><span style="font-size:11px;color:var(--muted);margin-left:6px">${s.name}</span></div>
+        <span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;background:${sigBg};color:${sigC};white-space:nowrap">${sigL}</span>
+      </div>
+      <p style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:10px">${s.reason}</p>
+      <div style="display:flex;gap:10px;font-size:11px">
+        ${s.change?`<span style="color:${chgC};font-weight:600">${s.change}</span>`:''}
+        <span style="color:var(--muted)">Risk: <span style="color:${riskC};font-weight:500">${s.risk||'–'}</span></span>
+      </div>
+    </div>`;
   });
-  sc.innerHTML=html||'<div class="empty">Inga rörelser hittades.</div>';
+  html+=`<div style="text-align:center;padding:12px;font-size:11px;color:var(--muted)">Gemini AI · Ej finansiell rådgivning</div>`;
+  sc.innerHTML=html;
 }
 
 // ── INSIDER ───────────────────────────────────────────────────────────────────
